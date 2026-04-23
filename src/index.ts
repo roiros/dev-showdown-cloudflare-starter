@@ -9,11 +9,7 @@ export default {
 
 		if (request.method === 'GET' && url.pathname === '/') {
 			const runningMessage = 'Dev Showdown Cloudflare Starter is running.';
-			const message = env.DEV_SHOWDOWN_API_KEY
-				? runningMessage
-				: [runningMessage, 'DEV_SHOWDOWN_API_KEY is missing.'].join(
-						'\n',
-					);
+			const message = env.DEV_SHOWDOWN_API_KEY ? runningMessage : [runningMessage, 'DEV_SHOWDOWN_API_KEY is missing.'].join('\n');
 
 			return new Response(message, {
 				headers: {
@@ -63,11 +59,28 @@ export default {
 					answer: result.text || 'N/A',
 				});
 			}
-				default:
-					return new Response('Solver not found', { status: 404 });
+
+			case 'JSON_MODE': {
+				if (!env.DEV_SHOWDOWN_API_KEY) {
+					throw new Error('DEV_SHOWDOWN_API_KEY is required');
+				}
+
+				const workshopLlm = createWorkshopLlm(env.DEV_SHOWDOWN_API_KEY, interactionId);
+				const result = await generateText({
+					model: workshopLlm.chatModel('puru-1'),
+					system: 'structure the user promopt as a JSON object',
+					prompt: payload.question,
+				});
+
+				return Response.json({
+					answer: result.text || 'N/A',
+				});
 			}
+			default:
+				return new Response('Solver not found', { status: 404 });
+		}
 	},
-	} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env>;
 
 function createWorkshopLlm(apiKey: string, interactionId: string) {
 	return createOpenAICompatible({
